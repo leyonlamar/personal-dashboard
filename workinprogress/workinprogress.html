@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="vendor/tesseract/tesseract.min.js"></script>
 <style>
   :root {
     --text-primary: #FAFAFA;
@@ -3152,6 +3153,144 @@
     .gt-cat-row .gt-seg { grid-column: 1 / -1; justify-self: start; }
   }
 
+  /* ---------- Paystub Importer ---------- */
+  .ps-section-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 8px;
+  }
+  .ps-section-head .section-title { margin: 0; }
+  .ps-import-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; margin-left: auto;
+    background: rgba(107,227,164,0.10);
+    border: 1px solid rgba(107,227,164,0.30);
+    color: #6BE3A4;
+    border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .ps-import-btn:hover { background: rgba(107,227,164,0.18); }
+  .ps-import-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ps-modal-bg {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 200; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .ps-modal-bg.show { display: flex; }
+  .ps-modal {
+    width: 100%; max-width: 560px;
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 16px;
+    padding: 22px; max-height: 88vh; overflow-y: auto;
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  }
+  .ps-modal h3 { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
+  .ps-modal-sub { margin: 0 0 16px; font-size: 12px; color: var(--text-tertiary); }
+  .ps-drop {
+    border: 1px dashed rgba(255,255,255,0.20);
+    border-radius: 12px; padding: 28px 16px;
+    text-align: center; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .ps-drop:hover, .ps-drop.is-drag {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(107,227,164,0.45);
+  }
+  .ps-drop-hint { font-size: 13px; color: var(--text-secondary); }
+  .ps-drop-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+  .ps-preview {
+    max-height: 140px; max-width: 100%; object-fit: contain;
+    display: block; margin: 10px auto 0;
+    border-radius: 8px;
+    border: 1px solid var(--hairline);
+  }
+  .ps-status {
+    margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+    font-size: 12px; line-height: 1.4;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--hairline);
+    color: var(--text-secondary);
+    display: none;
+  }
+  .ps-status.show { display: block; }
+  .ps-status.is-error {
+    color: #FF6B6B;
+    border-color: rgba(255,107,107,0.30);
+    background: rgba(255,107,107,0.08);
+  }
+  .ps-spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,0.20);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: ps-spin 0.7s linear infinite;
+    vertical-align: -2px; margin-right: 6px;
+  }
+  @keyframes ps-spin { to { transform: rotate(360deg); } }
+
+  .ps-review { margin-top: 14px; display: none; }
+  .ps-review.show { display: block; }
+  .ps-review-section-h {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.10em;
+    text-transform: uppercase; color: var(--text-tertiary);
+    margin: 14px 0 6px;
+  }
+  .ps-meta-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    margin-bottom: 4px;
+  }
+  .ps-meta-row label {
+    font-size: 10px; letter-spacing: 0.10em; text-transform: uppercase;
+    color: var(--text-tertiary);
+    display: block; margin-bottom: 3px;
+  }
+  .ps-meta-row input,
+  .ps-row input[type="text"],
+  .ps-row input[type="number"] {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--hairline);
+    border-radius: 6px; padding: 6px 8px;
+    color: var(--text-primary); font-family: inherit; font-size: 12px;
+    width: 100%; box-sizing: border-box;
+  }
+  .ps-row {
+    display: grid; grid-template-columns: 1fr 110px 28px;
+    gap: 8px; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .ps-row-head {
+    font-size: 10px; letter-spacing: 0.10em; text-transform: uppercase;
+    color: var(--text-tertiary);
+    border-bottom: none; padding-bottom: 2px;
+  }
+  .ps-row input[type="checkbox"] {
+    width: 16px; height: 16px; cursor: pointer; justify-self: center;
+  }
+  .ps-row.is-income input[type="text"] { color: #6BE3A4; }
+  .ps-row.is-expense input[type="text"] { color: #FF6B6B; }
+  .ps-actions {
+    display: flex; gap: 8px; margin-top: 18px;
+  }
+  .ps-btn {
+    flex: 1; padding: 10px 14px;
+    border-radius: 8px; border: 1px solid var(--hairline);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary);
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  .ps-btn:hover { background: rgba(255,255,255,0.08); }
+  .ps-btn.is-primary {
+    background: linear-gradient(180deg, #ffffff 0%, #e8e5dd 100%);
+    color: #0a0a0b; border-color: transparent;
+  }
+  .ps-btn.is-primary:hover { filter: brightness(1.05); }
+  .ps-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 </style>
 </head>
 <body>
@@ -3378,7 +3517,10 @@
 <!-- Income / Expenses Tables -->
 <div class="section fin-tables">
   <div class="fin-table-col">
-    <div class="section-title">Income</div>
+    <div class="ps-section-head">
+      <div class="section-title">Income</div>
+      <button class="ps-import-btn" id="psImportBtn" title="Extract income from a paystub image or PDF">📄 Import paystub</button>
+    </div>
     <div class="fin-quarter-bar" data-scope="income" id="incomeQuarterBar">
       <button class="fin-qbtn" data-q="q1">Q1</button>
       <button class="fin-qbtn" data-q="q2">Q2</button>
@@ -3405,6 +3547,26 @@
 <div class="section">
   <div class="section-title">Monetary Goals</div>
   <div class="gt-wrap" id="gtRoot"></div>
+</div>
+
+<!-- Paystub Importer Modal -->
+<div class="ps-modal-bg" id="psModalBg" role="dialog" aria-modal="true" aria-labelledby="psModalTitle">
+  <div class="ps-modal">
+    <h3 id="psModalTitle">Import paystub</h3>
+    <p class="ps-modal-sub">Drop a paystub image. OCR runs locally in your browser — no API key, no upload, no AI service. You review before anything is saved.</p>
+    <input type="file" id="psFileInput" accept="image/*" hidden>
+    <div class="ps-drop" id="psDrop">
+      <div class="ps-drop-hint">Click to choose a file, or drop here</div>
+      <div class="ps-drop-sub">PNG, JPG, or WebP · max 8 MB</div>
+    </div>
+    <img id="psPreview" class="ps-preview" hidden alt="Preview">
+    <div class="ps-status" id="psStatus"></div>
+    <div class="ps-review" id="psReview"></div>
+    <div class="ps-actions">
+      <button class="ps-btn" id="psCancelBtn" type="button">Cancel</button>
+      <button class="ps-btn is-primary" id="psConfirmBtn" type="button" disabled>Import</button>
+    </div>
+  </div>
 </div>
 
 </div>
@@ -6183,6 +6345,347 @@
     saveData(data);
     renderFinances();
   }
+
+  // ========== Paystub Importer ==========
+  // Runs Tesseract.js OCR locally in the browser. No API key, no upload, no AI service.
+  var PS_MAX_BYTES = 8 * 1024 * 1024;
+  var psExtracted = null;
+
+  function psQ(id) { return document.getElementById(id); }
+
+  function psShowStatus(msg, isError) {
+    var el = psQ('psStatus'); if (!el) return;
+    el.innerHTML = msg;
+    el.className = 'ps-status show' + (isError ? ' is-error' : '');
+  }
+  function psHideStatus() {
+    var el = psQ('psStatus'); if (el) el.className = 'ps-status';
+  }
+
+  function psReset() {
+    psExtracted = null;
+    var preview = psQ('psPreview');
+    if (preview) { preview.hidden = true; preview.src = ''; }
+    var review = psQ('psReview');
+    if (review) { review.classList.remove('show'); review.innerHTML = ''; }
+    var confirmBtn = psQ('psConfirmBtn');
+    if (confirmBtn) confirmBtn.disabled = true;
+    var input = psQ('psFileInput');
+    if (input) input.value = '';
+    psHideStatus();
+  }
+
+  function psOpenModal() {
+    var bg = psQ('psModalBg'); if (!bg) return;
+    psReset();
+    bg.classList.add('show');
+  }
+  function psCloseModal() {
+    var bg = psQ('psModalBg'); if (bg) bg.classList.remove('show');
+    psReset();
+  }
+
+  function psEscape(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function psNormalizeDate(s) {
+    if (!s) return null;
+    var m = String(s).match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (!m) return null;
+    var mo = parseInt(m[1], 10), d = parseInt(m[2], 10), y = parseInt(m[3], 10);
+    if (y < 100) y += 2000;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    return y + '-' + (mo < 10 ? '0' + mo : mo) + '-' + (d < 10 ? '0' + d : d);
+  }
+
+  function psFindAmount(text, patterns) {
+    for (var i = 0; i < patterns.length; i++) {
+      var rx = new RegExp('(?:^|[^A-Za-z])' + patterns[i] + '[^\\n\\r]*?\\$?\\s*([0-9]{1,3}(?:,[0-9]{3})+(?:\\.[0-9]{2})?|[0-9]+\\.[0-9]{2}|[0-9]+)', 'i');
+      var m = text.match(rx);
+      if (m) {
+        var n = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+    }
+    return 0;
+  }
+
+  function psParseText(rawText) {
+    var lines = rawText.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    var text = rawText.replace(/[ \t]+/g, ' ');
+
+    var netPay = psFindAmount(text, ['net\\s*pay', 'net\\s*amount', 'take\\s*home', 'net\\s*check', 'net\\s*earnings', 'net\\s*deposit']);
+    var grossPay = psFindAmount(text, ['gross\\s*pay', 'gross\\s*earnings', 'total\\s*earnings', 'gross\\s*wages', 'total\\s*gross']);
+
+    var taxes = [];
+    var fed = psFindAmount(text, ['federal\\s*income\\s*tax', 'federal\\s*tax', 'fed\\s*w/?h', 'fed\\s*tax', '\\bfit\\b', '\\bfwt\\b']);
+    if (fed) taxes.push({label: 'Federal Tax', amount: fed});
+    var ss = psFindAmount(text, ['social\\s*security', 'oasdi', 'fica[\\s\\-]{0,3}ss', 'ss\\s*tax', 'soc\\s*sec']);
+    if (ss) taxes.push({label: 'Social Security', amount: ss});
+    var med = psFindAmount(text, ['medicare', 'fica[\\s\\-]{0,3}med', 'med\\s*tax']);
+    if (med) taxes.push({label: 'Medicare', amount: med});
+    var state = psFindAmount(text, ['state\\s*income\\s*tax', 'state\\s*tax', 'state\\s*w/?h', '\\bsit\\b', '\\bswt\\b']);
+    if (state) taxes.push({label: 'State Tax', amount: state});
+    var local = psFindAmount(text, ['local\\s*tax', 'city\\s*tax', 'local\\s*w/?h']);
+    if (local) taxes.push({label: 'Local Tax', amount: local});
+    var sdi = psFindAmount(text, ['\\bsdi\\b', 'disability\\s*ins', 'state\\s*disability']);
+    if (sdi) taxes.push({label: 'SDI', amount: sdi});
+
+    var deductions = [];
+    var retire = psFindAmount(text, ['401\\s*\\(?k\\)?', '\\b401k\\b', '403\\s*\\(?b\\)?', 'retirement', 'roth\\s*401']);
+    if (retire) deductions.push({label: '401(k)', amount: retire});
+    var health = psFindAmount(text, ['health\\s*insurance', 'medical\\s*ins', 'health\\s*ins', '\\bhsa\\b', 'medical\\s*prem']);
+    if (health) deductions.push({label: 'Health Insurance', amount: health});
+    var dental = psFindAmount(text, ['dental\\s*insurance', 'dental\\s*ins', '\\bdental\\b']);
+    if (dental) deductions.push({label: 'Dental', amount: dental});
+    var vision = psFindAmount(text, ['vision\\s*insurance', 'vision\\s*ins', '\\bvision\\b']);
+    if (vision) deductions.push({label: 'Vision', amount: vision});
+    var life = psFindAmount(text, ['life\\s*insurance', 'life\\s*ins', 'group\\s*life']);
+    if (life) deductions.push({label: 'Life Insurance', amount: life});
+
+    var payDate = null;
+    var dateLabels = ['pay\\s*date', 'check\\s*date', 'paid\\s*on', 'pay\\s*end(?:ing)?', 'period\\s*end(?:ing)?', 'deposit\\s*date'];
+    for (var di = 0; di < dateLabels.length; di++) {
+      var drx = new RegExp(dateLabels[di] + '[^\\n\\r]*?(\\d{1,2}[\\/\\-\\.]\\d{1,2}[\\/\\-\\.]\\d{2,4})', 'i');
+      var dm = text.match(drx);
+      if (dm) { payDate = psNormalizeDate(dm[1]); if (payDate) break; }
+    }
+    if (!payDate) {
+      var anyDate = text.match(/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/);
+      if (anyDate) payDate = psNormalizeDate(anyDate[0]);
+    }
+
+    var employer = null;
+    for (var li = 0; li < Math.min(6, lines.length); li++) {
+      var s = lines[li];
+      if (s.length >= 3 && /[A-Za-z]/.test(s) && !/^\d/.test(s) && !/pay\s*stub|paystub|earnings\s*statement/i.test(s)) {
+        employer = s.replace(/[^\w\s&'.,\-]/g, '').trim().slice(0, 60);
+        if (employer) break;
+      }
+    }
+
+    return {
+      pay_date: payDate,
+      pay_period_start: null,
+      pay_period_end: null,
+      employer: employer,
+      gross_pay: grossPay,
+      net_pay: netPay,
+      taxes: taxes,
+      deductions: deductions,
+      raw_text: rawText
+    };
+  }
+
+  function psRunOCR(file) {
+    if (typeof Tesseract === 'undefined') {
+      return Promise.reject(new Error('OCR library failed to load. Check that vendor/tesseract/ exists alongside this file.'));
+    }
+    return Tesseract.recognize(file, 'eng', {
+      workerPath: 'vendor/tesseract/worker.min.js',
+      corePath: 'vendor/tesseract/',
+      langPath: 'vendor/tesseract/',
+      logger: function(m) {
+        if (!m) return;
+        if (m.status === 'recognizing text') {
+          var pct = Math.round((m.progress || 0) * 100);
+          psShowStatus('<span class="ps-spinner"></span>Reading paystub… ' + pct + '%');
+        } else if (m.status) {
+          var label = m.status.charAt(0).toUpperCase() + m.status.slice(1);
+          psShowStatus('<span class="ps-spinner"></span>' + label + '…');
+        }
+      }
+    }).then(function(result) {
+      var text = (result && result.data && result.data.text) || '';
+      if (!text.trim()) throw new Error('OCR found no readable text. Try a clearer image.');
+      var parsed = psParseText(text);
+      if (!parsed.net_pay && !parsed.gross_pay) {
+        throw new Error('OCR completed but no pay amounts were detected. Try a higher-resolution image, or enter manually.');
+      }
+      return parsed;
+    });
+  }
+
+  function psRenderReview(d) {
+    psExtracted = d;
+    var review = psQ('psReview');
+    if (!review) return;
+
+    var payDate = d.pay_date || (new Date().toISOString().slice(0, 10));
+    var employer = d.employer || 'Paycheck';
+    var net = Number(d.net_pay) || 0;
+    var taxes = Array.isArray(d.taxes) ? d.taxes : [];
+    var deductions = Array.isArray(d.deductions) ? d.deductions : [];
+
+    var html = '';
+    html += '<div class="ps-review-section-h">Paystub</div>';
+    html += '<div class="ps-meta-row">';
+    html += '<div><label>Employer</label><input type="text" id="psEmployer" value="' + psEscape(employer) + '"></div>';
+    html += '<div><label>Pay date</label><input type="text" id="psPayDate" value="' + psEscape(payDate) + '" placeholder="YYYY-MM-DD"></div>';
+    html += '</div>';
+
+    html += '<div class="ps-review-section-h">Income (net pay)</div>';
+    html += '<div class="ps-row ps-row-head"><div>Source</div><div>Amount</div><div>&#10003;</div></div>';
+    html += '<div class="ps-row is-income">';
+    html += '<input type="text" id="psNetSource" value="' + psEscape(employer + ' (paycheck)') + '">';
+    html += '<input type="number" step="0.01" id="psNetAmount" value="' + net.toFixed(2) + '">';
+    html += '<input type="checkbox" id="psNetCheck" checked>';
+    html += '</div>';
+
+    var allDeductions = taxes.concat(deductions);
+    if (allDeductions.length) {
+      html += '<div class="ps-review-section-h">Deductions (logged as expenses)</div>';
+      html += '<div class="ps-row ps-row-head"><div>Label</div><div>Amount</div><div>&#10003;</div></div>';
+      for (var i = 0; i < allDeductions.length; i++) {
+        var ded = allDeductions[i] || {};
+        var label = ded.label || 'Deduction';
+        var amt = Number(ded.amount) || 0;
+        html += '<div class="ps-row is-expense">';
+        html += '<input type="text" data-ps-ded-label="' + i + '" value="' + psEscape(label) + '">';
+        html += '<input type="number" step="0.01" data-ps-ded-amount="' + i + '" value="' + amt.toFixed(2) + '">';
+        html += '<input type="checkbox" data-ps-ded-check="' + i + '" checked>';
+        html += '</div>';
+      }
+    }
+
+    review.innerHTML = html;
+    review.classList.add('show');
+    var confirmBtn = psQ('psConfirmBtn');
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+
+  function psCommitReview() {
+    if (!psExtracted) return false;
+    var payDateEl = psQ('psPayDate');
+    var payDate = payDateEl ? payDateEl.value.trim() : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(payDate)) {
+      psShowStatus('Pay date must be YYYY-MM-DD.', true);
+      return false;
+    }
+    var data = loadData();
+    var added = 0;
+
+    var netCheck = psQ('psNetCheck');
+    if (netCheck && netCheck.checked) {
+      var srcEl = psQ('psNetSource');
+      var amtEl = psQ('psNetAmount');
+      var src = ((srcEl && srcEl.value) || 'Paycheck').trim();
+      var amt = Number(amtEl && amtEl.value) || 0;
+      if (amt > 0) {
+        data.income.push({
+          id: uid(),
+          source: src,
+          amount: amt,
+          tags: ['Salary'],
+          date: payDate
+        });
+        added++;
+      }
+    }
+
+    var allLen = ((psExtracted.taxes || []).length) + ((psExtracted.deductions || []).length);
+    for (var i = 0; i < allLen; i++) {
+      var c = document.querySelector('[data-ps-ded-check="' + i + '"]');
+      if (!c || !c.checked) continue;
+      var l = document.querySelector('[data-ps-ded-label="' + i + '"]');
+      var a = document.querySelector('[data-ps-ded-amount="' + i + '"]');
+      var label = ((l && l.value) || 'Deduction').trim();
+      var amount = Number(a && a.value) || 0;
+      if (amount <= 0) continue;
+      data.expenses.push({
+        id: uid(),
+        source: label,
+        amount: amount,
+        tags: ['Paycheck Deduction'],
+        date: payDate
+      });
+      added++;
+    }
+
+    if (added === 0) {
+      psShowStatus('Nothing selected to import.', true);
+      return false;
+    }
+    saveData(data);
+    renderFinances();
+    return true;
+  }
+
+  function psHandleFile(file) {
+    if (!file) return;
+    if (file.size > PS_MAX_BYTES) {
+      psShowStatus('File too large (max 8 MB).', true);
+      return;
+    }
+    var isImage = (file.type || '').indexOf('image/') === 0;
+    if (!isImage) {
+      psShowStatus('Only images are supported (PNG, JPG, WebP). For a PDF stub, take a screenshot first.', true);
+      return;
+    }
+
+    var preview = psQ('psPreview');
+    if (preview) {
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false;
+    }
+
+    var review = psQ('psReview');
+    if (review) { review.classList.remove('show'); review.innerHTML = ''; }
+    var confirmBtn = psQ('psConfirmBtn');
+    if (confirmBtn) confirmBtn.disabled = true;
+    psShowStatus('<span class="ps-spinner"></span>Starting OCR…');
+
+    psRunOCR(file).then(function(extracted) {
+      psHideStatus();
+      psRenderReview(extracted);
+    }).catch(function(err) {
+      psShowStatus((err && err.message) || 'OCR failed.', true);
+    });
+  }
+
+  function psWire() {
+    var importBtn = psQ('psImportBtn');
+    var bg = psQ('psModalBg');
+    var drop = psQ('psDrop');
+    var fileInput = psQ('psFileInput');
+    var cancelBtn = psQ('psCancelBtn');
+    var confirmBtn = psQ('psConfirmBtn');
+    if (!importBtn || !bg || !drop || !fileInput || !cancelBtn || !confirmBtn) return;
+
+    importBtn.addEventListener('click', psOpenModal);
+    cancelBtn.addEventListener('click', psCloseModal);
+    bg.addEventListener('click', function(e) { if (e.target === bg) psCloseModal(); });
+
+    drop.addEventListener('click', function() { fileInput.click(); });
+    drop.addEventListener('dragover', function(e) {
+      e.preventDefault(); drop.classList.add('is-drag');
+    });
+    drop.addEventListener('dragleave', function() { drop.classList.remove('is-drag'); });
+    drop.addEventListener('drop', function(e) {
+      e.preventDefault();
+      drop.classList.remove('is-drag');
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) psHandleFile(f);
+    });
+
+    fileInput.addEventListener('change', function() {
+      var f = fileInput.files && fileInput.files[0];
+      if (f) psHandleFile(f);
+    });
+
+    confirmBtn.addEventListener('click', function() {
+      if (psCommitReview()) psCloseModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && bg.classList.contains('show')) psCloseModal();
+    });
+  }
+
+  psWire();
 
   // ---- Monetary Goal Tracker ----
   var GOALS_KEY = 'finance_goals_v1';
